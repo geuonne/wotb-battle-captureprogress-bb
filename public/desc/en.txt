@@ -1,0 +1,10 @@
+This mod gives a WoT PC-like capture progress bar.
+- The vertical area is shrinked
+- The capture progress is shown always (Supremacy, Encounter when there are players from different teams on the base)
+- Only one file modified: no HUDLayer.yaml modifications needed. Can be useful for modpacks
+
+Compatibility:
+- Platform: any
+- Game publisher: any
+- Game version: any
+- Game version tested against: 9.7.0
