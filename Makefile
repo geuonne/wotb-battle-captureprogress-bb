@@ -2,6 +2,7 @@
 CD = cd
 CP = cp
 RM = rm
+PWD = pwd
 FIND = find
 MKDIR = mkdir
 CUT = cut
@@ -35,7 +36,7 @@ WMOD_PUBLISHER ?= $(WMOD_INITIALTARGETPUBLISHER)
 
 REV = HEAD
 # version from an annotated tag
-WMOD_VERSION = $(shell $(GIT) describe --abbrev=0 $(REV) 2>/dev/null)
+WMOD_VERSION != $(GIT) describe --abbrev=0 $(REV) 2>/dev/null
 
 # Package name. Needed for Android packages
 WOTB_PACKAGENAME = net.wargaming.wot.blitz
@@ -44,10 +45,10 @@ ifeq ($(WMOD_PUBLISHER), lg)
 endif
 
 # Mod title suitable for naming a package
-WMOD_NAME := $(shell echo $(WMOD_TITLE) | tr '[:upper:] ' '[:lower:]-')
-WMOD_PACKAGENAME = wotb_$(WMOD_NAME)_$(WMOD_VERSION)_$(WMOD_PLATFORM:any=anyplat)_$(WMOD_PUBLISHER:any=anypub)_$(WMOD_PATCH:any=anypatch)
+WMOD_NAME != echo $(WMOD_TITLE) | tr '[:upper:] ' '[:lower:]-'
+WMOD_PACKAGENAME = $(WMOD_NAME)_$(WMOD_VERSION)_$(WMOD_PLATFORM:any=anyplat)_$(WMOD_PUBLISHER:any=anypub)_$(WMOD_PATCH:any=anypatch)
 
-# platform-specific game prefix, needed for making base directory for pathe ckages
+# platform-specific game prefix, needed for making base directory for packages
 WOTB_PREFIX = .
 ifeq ($(WMOD_PLATFORM), pc)
 	WOTB_PREFIX = Data
@@ -56,21 +57,37 @@ ifeq ($(WMOD_PLATFORM), android)
 	WOTB_PREFIX = $(WOTB_PACKAGENAME)/files/packs
 endif
 
+# Default unset (impossible to determine where the game is installed)
+WOTB_INSTALLDIR = .
+ifeq ($(WMOD_PLATFORM), android)
+	WOTB_INSTALLDIR = /sdcard/Android/data
+endif
 
-WMOD_INSTALLDIR = /sdcard/Android/data/$(WOTB_PREFIX)
+# Default unset (impossible to determine where the game is installed)
+WMOD_INSTALLDIR = .
+ifeq ($(WMOD_PLATFORM), android)
+	WMOD_INSTALLDIR = $(WOTB_INSTALLDIR)/$(WOTB_PREFIX)
+endif
 
+SRCDIR = src
 BUILDDIR = build
 MEDIADIR = public/media
-SCRIPTSDIR = scripts
+DISTDIR = dist/general
+TOOLSDIR = tools
+_ROOT != $(PWD)
 
 BUILDPLATFORMDIR = $(BUILDDIR)/$(WMOD_PLATFORM)/$(WOTB_PREFIX)
+
+DEPS != find 'src' -type f
+
+
 
 ### Rules
 all: build
 
-build:
+build: $(DEPS)
 	$(MKDIR) -p $(BUILDPLATFORMDIR)
-	$(CP) -R src/* $(BUILDPLATFORMDIR)
+	$(CP) -R $(SRCDIR)/* $(BUILDPLATFORMDIR)
 ifeq ($(WMOD_DVPLIZE), y)
 	$(CD) $(BUILDPLATFORMDIR) && $(DVPL) compress
 endif
@@ -81,13 +98,44 @@ install: build
 #description:
 #	scripts/make-desc.sh
 
+# Create release on GitHub
+.PHONY: release
 release:
-	$(GH) release create -t $(WMOD_VERSION) $(WMOD_VERSION) $(BUILDDIR)/*.zip
+	$(GH) release create -t $(WMOD_VERSION) $(WMOD_VERSION) $(shell $(FIND) $(DISTDIR) -name "*.zip")
 
-.PHONY: package
-package: build
-	$(CD) $(BUILDDIR)/$(WMOD_PLATFORM) && $(7Z) a $(WMOD_PACKAGENAME).zip $(WOTB_PREFIX)
+# build packages in general format
+.PHONY: dist-general
+dist-general: DISTDIR = dist/general
+dist-general: build
+	$(CD) $(BUILDDIR)/$(WMOD_PLATFORM) && $(7Z) a $(_ROOT)/$(DISTDIR)/$(WMOD_PACKAGENAME).zip $(WOTB_PREFIX)
 
-.PHONY: clean
-clean:
+# build packages as required by Forblitz
+.PHONY: dist-forblitz
+dist-forblitz: DISTDIR = dist/forblitz
+ifneq ($(WMOD_PLATFORM), pc)
+dist-forblitz: WMOD_PACKAGENAME = $(WMOD_NAME)_$(WMOD_VERSION)_$(WMOD_PLATFORM)
+endif
+dist-forblitz: build
+ifeq ($(WMOD_PLATFORM), pc)
+	$(eval WMOD_PACKAGENAME = $(WMOD_NAME)_$(WMOD_VERSION)_steam)
+endif
+	$(MKDIR) -p $(DISTDIR)
+	$(CD) $(BUILDDIR)/$(WMOD_PLATFORM) && $(7Z) a $(_ROOT)/$(DISTDIR)/$(WMOD_PACKAGENAME).zip $(WOTB_PREFIX)
+
+# build packages for distributing
+.PHONY: dist
+dist: dist-general
+
+# Clean packages
+.PHONY: distclean
+distclean:
+	$(RM) -r -f dist/
+
+# Clean build artifacts
+.PHONY: buildclean
+buildclean:
 	$(RM) -r -f $(BUILDDIR)
+
+# Clean all
+.PHONY: clean
+clean: distclean buildclean
