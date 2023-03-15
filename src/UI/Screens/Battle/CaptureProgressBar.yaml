@@ -24,13 +24,14 @@ StyleSheets:
 Controls:
 -   class: "UIControl"
     name: "CaptureProgressBar"
+    # A pivot+scale hack for vertical shift & affecting only one file
+    pivot: [0.500000, 88.000000]
+    scale: [1.025000, 1.025000]
     noInput: true
     components:
         SizePolicy:
-            horizontalPolicy: "FixedSize"
-            horizontalSize: 400.000000
             verticalPolicy: "FixedSize"
-            verticalValue: 32.000000
+            verticalValue: 28.000000
     children:
     -   class: "UIControl"
         name: "Outline"
